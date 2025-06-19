@@ -31,7 +31,12 @@
 ### Шаг 1: Настройка преобразователя (конвектора) 
 1. скорость порта: 9600 
 2. четность: четные
-3. адрес по modbus RTU: 1
+   
+![image](https://github.com/user-attachments/assets/9362ee80-fce7-490d-8e1c-225118e33895)
+
+
+![image](https://github.com/user-attachments/assets/b89eeebb-8720-435c-b2b5-1513ca9325f3)
+
 
 ### Шаг 2: Настройка `configuration.yaml`
 
