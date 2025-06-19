@@ -1,0 +1,350 @@
+#
+# Пакет для полной интеграции рекуператора Zentec Z031
+#
+
+#================================================#
+#   1. КОНФИГУРАЦИЯ MODBUS И СЕНСОРЫ             #
+#================================================#
+modbus:
+  - name: modbus_hub
+    type: tcp
+    host: 192.168.1.45
+    port: 502
+    delay: 0
+    message_wait_milliseconds: 20
+    timeout: 5
+    
+    sensors:
+      - name: "Zentec Z031 t4"
+        slave: 247
+        address: 6
+        input_type: holding
+        data_type: int16
+        scale: 0.01
+        precision: 2
+        unit_of_measurement: "°C"
+        device_class: temperature
+      - name: "Zentec Z031 t1"
+        slave: 247
+        address: 7
+        input_type: holding
+        data_type: int16
+        scale: 0.01
+        precision: 2
+        unit_of_measurement: "°C"
+        device_class: temperature
+      - name: "Zentec Z031 t2"
+        slave: 247
+        address: 8
+        input_type: holding
+        data_type: int16
+        scale: 0.01
+        precision: 2
+        unit_of_measurement: "°C"
+        device_class: temperature
+      - name: "Zentec Z031 t3"
+        slave: 247
+        address: 9
+        input_type: holding
+        data_type: int16
+        scale: 0.01
+        precision: 2
+        unit_of_measurement: "°C"
+        device_class: temperature
+      - name: "zentec_z031_log_pusk"
+        slave: 247
+        address: 10
+        input_type: holding
+        data_type: uint16
+      - name: "Zentec Z031 Текущая дискретная скорость"
+        slave: 247
+        address: 16
+        input_type: holding
+        data_type: uint16
+      - name: "Zentec Z031 Текущая уставка температуры"
+        slave: 247
+        address: 22
+        input_type: holding
+        data_type: uint16
+        scale: 1
+        precision: 0
+        unit_of_measurement: "°C"
+        device_class: temperature
+      - name: "zentec_z031_current_mode"
+        slave: 247
+        address: 205
+        input_type: holding
+        data_type: uint16
+        scan_interval: 60
+      - name: "Zentec Z031 Код ошибки"
+        slave: 247
+        address: 207
+        input_type: holding
+        data_type: uint16
+      - name: "Zentec Z031 Т в канале"
+        slave: 247
+        address: 208
+        input_type: holding
+        data_type: uint16
+        scale: 0.1
+        precision: 1
+        unit_of_measurement: "°C"
+        device_class: temperature
+        
+    switches:
+      - name: "Zentec Z031 On/Off"
+        slave: 247
+        address: 203
+        write_type: holding
+
+#================================================#
+#   2. ВСПОМОГАТЕЛЬНЫЕ ЭЛЕМЕНТЫ (СЛАЙДЕРЫ)       #
+#================================================#
+input_number:
+  zentec_z031_temperature:
+    name: Zentec Z031 Temperature Control
+    min: 15
+    max: 30
+    step: 1
+    icon: mdi:thermometer
+    unit_of_measurement: "°C"
+    mode: slider
+    
+  zentec_z031_fan_speed:
+    name: Zentec Z031 Fan Speed Control
+    min: 0
+    max: 7
+    step: 1
+    icon: mdi:fan
+    mode: slider
+    initial: 1
+
+#================================================#
+#   3. ШАБЛОННЫЕ СЕНСОРЫ (ДЛЯ UI)                #
+#================================================#
+template:
+  - sensor:
+      - name: "Zentec Z031 Описание Статуса"
+        unique_id: zentec_z031_status_description
+        state: >
+          {% set error_code = states('sensor.zentec_z031_kod_oshibki') %}
+          {% set errors = {
+            "0": "Система в норме", "256": "Засорение фильтра (необходимо уточнение)", "258": "Отказ датчика температуры приточного воздуха (Е02)",
+            "261": "Отказ датчика температуры в помещении (Е05)", "262": "Авария вентилятора приточного воздуха (Е06)", "264": "Температура приточного воздуха ниже допустимого значения (Е08)",
+            "2817": "Сработала пожарная сигнализация (Е01)", "2819": "Отказ датчика обратной воды (Е03)", "2820": "Отказ датчика температуры наружного воздуха (Е04)",
+            "2823": "Сработал термостат нагревателя (Е07)", "2825": "Температура обратной воды ниже допустимого значения (Е09)"
+          } %}
+          {{ errors.get(error_code, 'Неизвестный статус или ошибка: ' ~ error_code) }}
+        icon: >
+          {% if states('sensor.zentec_z031_kod_oshibki') | int(0) == 0 %} mdi:check-circle {% else %} mdi:alert-circle {% endif %}
+
+      - name: "Zentec Z031 Текущий режим текст"
+        unique_id: zentec_z031_current_mode_text
+        state: >
+          {% set mode = states('sensor.zentec_z031_current_mode') %}
+          {% set modes = {'1': 'Вентиляция', '2': 'Обогрев', '4': 'Охлаждение'} %}
+          {{ modes.get(mode, 'Неизвестный режим') }}
+        icon: >
+          {% set mode = states('sensor.zentec_z031_current_mode') %}
+          {% if mode == '1' %} mdi:fan {% elif mode == '2' %} mdi:heat-wave {% elif mode == '4' %} mdi:snowflake {% else %} mdi:help-rhombus {% endif %}
+
+#================================================#
+#   4. СКРИПТЫ УПРАВЛЕНИЯ                        #
+#================================================#
+script:
+  zentec_z031_ventilation_mode:
+    alias: "Zentec Z031: Режим проветривания 15 мин"
+    sequence:
+      - variables:
+          current_speed: "{{ states('sensor.zentec_z031_tekushchaya_diskretnaya_skorost') | int(1) }}"
+          current_mode: "{{ states('sensor.zentec_z031_current_mode') | int(1) }}"
+          current_temp: "{{ states('sensor.zentec_z031_tekushchaya_ustavka_temperatury') | int(22) }}"
+      - service: script.zentec_z031_set_all
+        data: {state: 1, speed: 7, mode: 1, temperature: 22}
+      - delay: {minutes: 15}
+      - service: script.zentec_z031_set_all
+        data:
+          state: 1
+          speed: "{{ current_speed }}"
+          mode: "{{ current_mode }}"
+          temperature: "{{ current_temp }}"
+
+  zentec_z031_night_mode:
+    alias: "Zentec Z031: Ночной режим"
+    sequence:
+      - service: script.zentec_z031_set_all
+        data: {state: 1, speed: 1, mode: 2, temperature: 18}
+
+  zentec_z031_day_mode:
+    alias: "Zentec Z031: Дневной режим"
+    sequence:
+      - service: script.zentec_z031_set_all
+        data: {state: 1, speed: 3, mode: 2, temperature: 22}
+
+  zentec_z031_quick_off:
+    alias: "Zentec Z031: Быстрое выключение"
+    sequence:
+      - service: switch.turn_off
+        target: {entity_id: switch.zentec_z031_on_off}
+
+  zentec_z031_power:
+    alias: "Zentec Z031: Управление питанием"
+    sequence:
+      - service: modbus.write_register
+        data:
+          hub: modbus_hub
+          slave: 247
+          address: 203
+          value: "{{ state | int }}"
+
+  zentec_z031_set_fan_speed:
+    alias: "Zentec Z031: Установка скорости"
+    sequence:
+      - service: modbus.write_register
+        data:
+          hub: modbus_hub
+          slave: 247
+          address: 204
+          value: "{{ speed | int }}"
+  
+  zentec_z031_set_mode:
+    alias: "Zentec Z031: Установка режима"
+    sequence:
+      - service: modbus.write_register
+        data:
+          hub: modbus_hub
+          slave: 247
+          address: 205
+          value: "{{ mode | int }}"
+  
+  zentec_z031_set_temperature:
+    alias: "Zentec Z031: Установка температуры"
+    sequence:
+      - service: modbus.write_register
+        data:
+          hub: modbus_hub
+          slave: 247
+          address: 206
+          value: "{{ temperature | int }}"
+
+  zentec_z031_set_all:
+    alias: "Zentec Z031: Комбинированная установка"
+    sequence:
+      - service: modbus.write_register
+        data:
+          hub: modbus_hub
+          slave: 247
+          address: 203
+          value: "{{ state | default(1) | int }}"
+      - delay: {seconds: 1}
+      - service: modbus.write_register
+        data:
+          hub: modbus_hub
+          slave: 247
+          address: 204
+          value: "{{ speed | default(1) | int }}"
+      - delay: {seconds: 1}
+      - service: modbus.write_register
+        data:
+          hub: modbus_hub
+          slave: 247
+          address: 205
+          value: "{{ mode | default(1) | int }}"
+      - delay: {seconds: 1}
+      - service: modbus.write_register
+        data:
+          hub: modbus_hub
+          slave: 247
+          address: 206
+          value: "{{ temperature | default(22) | int }}"
+
+#================================================#
+#   5. АВТОМАТИЗАЦИИ                             #
+#================================================#
+automation:
+- id: fd9a1e99f7ca4e7b9ed38313417a3aa3
+  alias: 'Zentec Z031 Temperature Sync'
+  description: 'Синхронизирует слайдер температуры с устройством'
+  trigger:
+    - platform: state
+      entity_id: input_number.zentec_z031_temperature
+  action:
+    - service: script.zentec_z031_set_temperature
+      data:
+        temperature: '{{ states(''input_number.zentec_z031_temperature'') | int }}'
+- id: 9df7f93187b249aa9b392dfe6035b8b7
+  alias: 'Zentec Z031 Fan Speed Sync'
+  description: 'Синхронизирует слайдер скорости вентилятора с устройством'
+  trigger:
+    - platform: state
+      entity_id: input_number.zentec_z031_fan_speed
+  action:
+    - service: script.zentec_z031_set_fan_speed
+      data:
+        speed: '{{ states(''input_number.zentec_z031_fan_speed'') | int }}'
+- id: 303ab45f3d7e4c5eb36fc5dceeb326b3
+  alias: 'Zentec Z031 Save Last Values'
+  description: 'Сохраняет последние значения температуры и скорости'
+  trigger:
+    - platform: homeassistant
+      event: start
+  action:
+    - delay:
+        seconds: 10
+    - service: input_number.set_value
+      target:
+        entity_id: input_number.zentec_z031_temperature
+      data:
+        value: '{{ states(''sensor.zentec_z031_tekushchaya_ustavka_temperatury'') | float(22) }}'
+    - service: input_number.set_value
+      target:
+        entity_id: input_number.zentec_z031_fan_speed
+      data:
+        value: '{{ states(''sensor.zentec_z031_tekushchaya_diskretnaya_skorost'') | int(1) }}'
+- id: 7e68ca22609442bb8b36f59aa51534cf
+  alias: 'Zentec Z031 Restore Power State'
+  description: 'Восстанавливает состояние включения/выключения при перезагрузке'
+  trigger:
+    - platform: homeassistant
+      event: start
+  action:
+    - delay:
+        seconds: 15
+    - service: switch.turn_on
+      target:
+        entity_id: switch.zentec_z031_on_off
+      data: {}
+    - condition: template
+      value_template: "{{ states('sensor.zentec_z031_log_pusk') | int(0) == 0 }}"
+    - service: switch.turn_off
+      target:
+        entity_id: switch.zentec_z031_on_off
+      data: {}
+- id: 9ed0e5cdaf554e82a7c58339e487535a
+  alias: 'Zentec Z031 Update UI From Device'
+  description: 'Обновляет UI в соответствии с текущими значениями устройства'
+  trigger:
+    - platform: state
+      entity_id: sensor.zentec_z031_tekushchaya_diskretnaya_skorost
+    - platform: state
+      entity_id: sensor.zentec_z031_tekushchaya_ustavka_temperatury
+  action:
+    - choose:
+      - conditions:
+          - condition: template
+            value_template: '{{ trigger.entity_id == ''sensor.zentec_z031_tekushchaya_diskretnaya_skorost'' }}'
+        sequence:
+          - service: input_number.set_value
+            target:
+              entity_id: input_number.zentec_z031_fan_speed
+            data:
+              value: '{{ states(''sensor.zentec_z031_tekushchaya_diskretnaya_skorost'') | int(1) }}'
+      - conditions:
+          - condition: template
+            value_template: '{{ trigger.entity_id == ''sensor.zentec_z031_tekushchaya_ustavka_temperatury'' }}'
+        sequence:
+          - service: input_number.set_value
+            target:
+              entity_id: input_number.zentec_z031_temperature
+            data:
+              value: '{{ states(''sensor.zentec_z031_tekushchaya_ustavka_temperatury'') | float(22) }}'
