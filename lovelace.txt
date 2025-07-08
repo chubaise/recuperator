@@ -1,0 +1,127 @@
+type: vertical-stack
+cards:
+  - type: custom:mushroom-title-card
+    title: Управление рекуператором
+    subtitle: >-
+      {{ states('sensor.zentec_z031_opisanie_statusa') |
+      replace('Система в норме', '') }}
+  - type: custom:mushroom-template-card
+    primary: Рекуператор
+    secondary: >-
+      {% if is_state('switch.zentec_z031_on_off', 'on') %}
+        Включен |
+        {{ states('sensor.zentec_z031_t_v_kanale') }}°C | {{
+        states('sensor.zentec_z031_tekushchii_rezhim_tekst') }}
+      {% else %}
+        Выключен
+      {% endif %}
+    icon: >-
+      {% if is_state('switch.zentec_z031_on_off', 'on') %}
+        mdi:fan
+      {% else %}
+        mdi:fan-off
+      {% endif %}
+    entity: switch.zentec_z031_on_off
+    icon_color: >-
+      {% if is_state('switch.zentec_z031_on_off', 'on') %}
+        amber
+      {% else %}
+        disabled
+      {% endif %}
+    tap_action:
+      action: toggle
+    badge_icon: >-
+      {% if states('sensor.zentec_z031_kod_oshibki') | int(0) != 0 %}
+        mdi:alert-circle
+      {% endif %}
+    badge_color: red
+  - type: horizontal-stack
+    cards:
+      - type: custom:mushroom-number-card
+        entity: input_number.zentec_z031_temperature
+        name: Температура
+        display_mode: slider
+        icon: mdi:thermometer
+      - type: custom:mushroom-number-card
+        entity: input_number.zentec_z031_fan_speed
+        name: Скорость
+        display_mode: slider
+        icon: mdi:fan
+  - type: custom:mushroom-chips-card
+    alignment: center
+    chips:
+      - type: template
+        entity: sensor.zentec_z031_current_mode
+        content: Вентиляция
+        icon: mdi:fan
+        tap_action:
+          action: call-service
+          service: script.zentec_z031_set_all
+          data:
+            mode: 1
+        card_mod:
+          style: |
+            ha-card {
+              {% if is_state('sensor.zentec_z031_current_mode', '1') %}
+                background-color: var(--mush-rgb-amber);
+                color: white;
+              {% endif %}
+            }
+      - type: template
+        entity: sensor.zentec_z031_current_mode
+        content: Обогрев
+        icon: mdi:heat-wave
+        tap_action:
+          action: call-service
+          service: script.zentec_z031_set_all
+          data:
+            mode: 2
+        card_mod:
+          style: |
+            ha-card {
+              {% if is_state('sensor.zentec_z031_current_mode', '2') %}
+                background-color: var(--mush-rgb-amber);
+                color: white;
+              {% endif %}
+            }
+      - type: template
+        entity: sensor.zentec_z031_current_mode
+        content: Охлаждение
+        icon: mdi:snowflake
+        tap_action:
+          action: call-service
+          service: script.zentec_z031_set_all
+          data:
+            mode: 4
+        card_mod:
+          style: |
+            ha-card {
+              {% if is_state('sensor.zentec_z031_current_mode', '4') %}
+                background-color: var(--mush-rgb-amber);
+                color: white;
+              {% endif %}
+            }
+  - type: custom:mushroom-chips-card
+    alignment: center
+    chips:
+      - type: action
+        icon: mdi:weather-sunny
+        tap_action:
+          action: call-service
+          service: script.zentec_z031_day_mode
+        hold_action:
+          action: none
+      - type: action
+        icon: mdi:weather-night
+        tap_action:
+          action: call-service
+          service: script.zentec_z031_night_mode
+        hold_action:
+          action: none
+      - type: action
+        icon: mdi:refresh-auto
+        tap_action:
+          action: call-service
+          service: script.zentec_z031_ventilation_mode
+        hold_action:
+          action: none
