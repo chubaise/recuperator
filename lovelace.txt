@@ -56,9 +56,9 @@ cards:
         icon: mdi:fan
         tap_action:
           action: call-service
-          service: script.zentec_z031_set_all
+          service: script.zentec_z031_set_mode ## ИСПРАВЛЕНИЕ
           data:
-            mode: 1
+            mode: 1 ## ИСПРАВЛЕНИЕ
         card_mod:
           style: |
             ha-card {
@@ -73,9 +73,9 @@ cards:
         icon: mdi:heat-wave
         tap_action:
           action: call-service
-          service: script.zentec_z031_set_all
+          service: script.zentec_z031_set_mode ## ИСПРАВЛЕНИЕ
           data:
-            mode: 2
+            mode: 2 ## ИСПРАВЛЕНИЕ
         card_mod:
           style: |
             ha-card {
@@ -90,9 +90,9 @@ cards:
         icon: mdi:snowflake
         tap_action:
           action: call-service
-          service: script.zentec_z031_set_all
+          service: script.zentec_z031_set_mode ## ИСПРАВЛЕНИЕ
           data:
-            mode: 4
+            mode: 4 ## ИСПРАВЛЕНИЕ
         card_mod:
           style: |
             ha-card {
