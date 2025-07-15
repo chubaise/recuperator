@@ -57,6 +57,7 @@ modbus:
         address: 16
         input_type: holding
         data_type: uint16
+        scan_interval: 10 ## ИСПРАВЛЕНИЕ: Добавлен интервал опроса
       - name: "Zentec Z031 Текущая уставка температуры"
         slave: 247
         address: 22
@@ -168,6 +169,37 @@ input_number:
 #   4. СКРИПТЫ УПРАВЛЕНИЯ                        #
 #================================================#
 script:
+  ## ИСПРАВЛЕНИЕ: Возвращены простые скрипты для надежности
+  zentec_z031_set_fan_speed:
+    alias: "Zentec Z031: Установка скорости"
+    sequence:
+      - service: modbus.write_register
+        data:
+          hub: modbus_hub
+          slave: 247
+          address: 204
+          value: "{{ speed | int }}"
+  
+  zentec_z031_set_mode:
+    alias: "Zentec Z031: Установка режима"
+    sequence:
+      - service: modbus.write_register
+        data:
+          hub: modbus_hub
+          slave: 247
+          address: 205
+          value: "{{ mode | int }}"
+  
+  zentec_z031_set_temperature:
+    alias: "Zentec Z031: Установка температуры"
+    sequence:
+      - service: modbus.write_register
+        data:
+          hub: modbus_hub
+          slave: 247
+          address: 206
+          value: "{{ temperature | int }}"
+
   zentec_z031_set_all:
     alias: "Zentec Z031: Комбинированная установка"
     sequence:
@@ -239,12 +271,9 @@ automation:
     - platform: state
       entity_id: input_number.zentec_z031_temperature
   action:
-    - service: modbus.write_register
+    - service: script.zentec_z031_set_temperature
       data:
-        hub: modbus_hub
-        slave: 247
-        address: 206
-        value: '{{ states(''input_number.zentec_z031_temperature'') | int }}'
+        temperature: '{{ trigger.to_state.state | int }}'
 
 - id: 9df7f93187b249aa9b392dfe6035b8b7
   alias: 'Zentec Z031 Fan Speed Sync'
@@ -253,31 +282,36 @@ automation:
     - platform: state
       entity_id: input_number.zentec_z031_fan_speed
   action:
-    - service: modbus.write_register
+    - service: script.zentec_z031_set_fan_speed
       data:
-        hub: modbus_hub
-        slave: 247
-        address: 204
-        value: '{{ states(''input_number.zentec_z031_fan_speed'') | int }}'
+        speed: '{{ trigger.to_state.state | int }}'
         
 - id: 9ed0e5cdaf554e82a7c58339e487535a
   alias: 'Zentec Z031 Update UI From Device'
-  description: 'Обновляет UI в соответствии с текущими значениями устройства при старте и при изменениях'
+  description: 'Обновляет UI в соответствии с текущими значениями устройства'
   trigger:
-    - platform: homeassistant
-      event: start
+    ## ИСПРАВЛЕНО: Указано точное имя сенсора с вашего скриншота
     - platform: state
-      entity_id: 
-        - sensor.zentec_z031_tekushchaya_diskretnaya_skorost
-        - sensor.zentec_z031_tekushchaya_ustavka_temperatury
+      entity_id: sensor.zentec_z031_tekushchaia_diskretnaia_skorost 
+    - platform: state
+      entity_id: sensor.zentec_z031_tekushchaia_ustavka_temperatury
   action:
-    - service: input_number.set_value
-      target:
-        entity_id: input_number.zentec_z031_fan_speed
-      data:
-        value: '{{ states("sensor.zentec_z031_tekushchaya_diskretnaya_skorost") | int(1) }}'
-    - service: input_number.set_value
-      target:
-        entity_id: input_number.zentec_z031_temperature
-      data:
-        value: '{{ states("sensor.zentec_z031_tekushchaya_ustavka_temperatury") | float(22) }}'
+    - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.entity_id == 'sensor.zentec_z031_tekushchaia_diskretnaia_skorost' }}"
+        sequence:
+          - service: input_number.set_value
+            target:
+              entity_id: input_number.zentec_z031_fan_speed
+            data:
+              value: "{{ states('sensor.zentec_z031_tekushchaia_diskretnaia_skorost') | int(1) }}"
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.entity_id == 'sensor.zentec_z031_tekushchaia_ustavka_temperatury' }}"
+        sequence:
+          - service: input_number.set_value
+            target:
+              entity_id: input_number.zentec_z031_temperature
+            data:
+              value: "{{ states('sensor.zentec_z031_tekushchaia_ustavka_temperatury') | float(22) }}"
